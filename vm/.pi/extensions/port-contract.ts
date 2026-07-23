@@ -42,8 +42,8 @@ export default function (pi: ExtensionAPI) {
         block: true,
         reason:
           `PORT CONTRACT VIOLATION in ${path}: ${problem} ` +
-          `The exe.dev HTTPS proxy is pinned to process.env.PORT — the server MUST use ` +
-          "`const port = Number(process.env.PORT)` and listen on 0.0.0.0. Rewrite and retry.",
+          `The nginx edge in front of this app proxies to process.env.PORT — the server MUST use ` +
+          "`const port = Number(process.env.PORT)` and listen on 127.0.0.1. Rewrite and retry.",
       };
     }
   });

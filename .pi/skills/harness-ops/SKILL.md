@@ -13,7 +13,11 @@ read/bash/edit/write for everything else. Architecture details: PLAN.md. Ops ref
 
 - One app = one exe.dev micro-VM (`<app>.exe.xyz`) + one isolated PlanetScale Postgres branch
   (the branch IS its database) + two scoped roles (migrate=DDL, runtime=DML via PgBouncer :6432).
-- Provisioning is a 9-step idempotent state machine persisted in `state/<app>.json`.
+- Request chain: exe.dev :443 → VM :8000 (nginx edge; gates /admin and /api/admin with basic auth
+  from ADMIN_USER/ADMIN_PASSWORD) → 127.0.0.1:$PORT (app under systemd unit `app`, Restart=always).
+- Apps are PRIVATE by default (exe.dev login for every route). `--public` opens the public plane;
+  the operator plane (/admin*) stays basic-auth-gated either way. Admin creds: `state/<app>.json`.
+- Provisioning is an 11-step idempotent state machine persisted in `state/<app>.json`.
   A failed run names the step; fix, then call `provision_app` again — done steps skip.
 - VMs are disposable; durable state = PlanetScale + `state/`. Teardown is cheap and safe.
 
@@ -24,7 +28,8 @@ read/bash/edit/write for everything else. Architecture details: PLAN.md. Ops ref
 - **"Is it up?"** → `verify_app`; deeper: `app_status`, then
   `bash: ssh <app>.exe.xyz 'tail -50 ~/app/app.log; ss -tlnp'`.
 - **App code changes after generation**: ssh into the VM (`ssh <app>.exe.xyz`), edit under `~/app`,
-  restart (`cd ~/app && set -a && . ./.env && set +a && pkill -f 'npm start'; nohup npm start > app.log 2>&1 &`).
+  then `sudo systemctl restart app` (logs: `~/app/app.log`, status: `systemctl status app`).
+  nginx config changes: edit `/etc/nginx/sites-available/app`, `sudo nginx -t && sudo systemctl reload nginx`.
   Schema change: edit `~/app/prisma/schema.prisma`, then clear the `db.migrate` and `db.promote`
   entries in `state/<app>.json` and re-run `provision_app` (re-applies diff idempotently).
 - **Force one step to re-run**: delete its entry from `state/<app>.json` (edit tool), re-provision.

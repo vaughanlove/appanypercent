@@ -45,7 +45,13 @@ Pi docs (`@earendil-works/pi-coding-agent` v0.81.1).
 5. **How exe.dev `--env` vars are exposed inside the VM is not precisely documented.** We therefore do
    not rely on it for secrets; secrets are written over SSH to `~/app/.env` (mode 0600). See §3.
 
-6. **PlanetScale publishes an official agent-setup flow** (`/docs/agent-setup/prompt`): `pscale` 0.292.0+
+6. **Field-tested corrections (see git history "HARNESS-" fixes):** (a) exe.dev's stock image ships
+   Node 18 — Pi needs >= 22 (pi-tui `/v` regex flags), so app.generate installs Node 22 via
+   NodeSource and asserts; (b) Prisma 7's `--from-config-datasource` flags don't exist on Prisma 6,
+   which generators naturally emit — the harness pins Prisma **6.19.3** in the skill and
+   auto-detects the installed major to pick matching flags; (c) the platform proxy was observed
+   defaulting to port 8000 with an inactive static-only nginx — see §5 for the fixed port story.
+7. **PlanetScale publishes an official agent-setup flow** (`/docs/agent-setup/prompt`): `pscale` 0.292.0+
    ships `pscale auth check --format json` (the documented auth probe, used by our doctor),
    `pscale agent-guide --format json` (machine-readable CLI conventions), and an official skills repo
    (github.com/planetscale/skills, Agent Skills format — Pi-compatible). Conventions we follow from it:
@@ -133,15 +139,35 @@ Pi appears **twice**, on opposite sides of the security boundary, with separate 
     to integrate with — the app only does authorization + a lazy Prisma `User` upsert keyed on the
     stable UserID. App-managed accounts (e.g. better-auth) are an explicit opt-in escalation only.
 
-## 5. App ↔ proxy port contract (explicit, can't fail silently)
+## 5. Port story & the operator plane (revised after field testing — HARNESS-2/3/4)
 
-Single source of truth: `APP_PORT` (default **8080**, `--port` to override). It is (a) written to
-`~/app/.env` as `PORT`, (b) enforced at generation time by the port-contract extension, (c) set
-explicitly on the proxy via `ssh exe.dev share port <app> <port>` — we never rely on exe.dev's
-auto-pick ("smallest exposed TCP port") — and (d) verified twice: in-VM `curl localhost:$PORT/healthz`
-(app up?) then external `https://<app>.exe.xyz/` (proxy routed?). A mismatch produces a step-named,
-actionable error, never a silent hang. (Docs note: ports 3000–9999 are also transparently forwarded
-at `https://<app>.exe.xyz:<port>/` for authenticated users — useful for debugging.)
+One coherent chain, every hop provisioned and verified:
+
+```
+exe.dev :443 (TLS) ─▶ VM :8000 nginx edge ─▶ 127.0.0.1:$PORT app (systemd, Restart=always)
+                        └─ gates /admin + /api/admin with basic auth (ADMIN_USER/ADMIN_PASSWORD)
+```
+
+- The app binds `process.env.PORT` on **loopback** (enforced by skill + port-contract extension).
+- The app runs under a **systemd unit** (`app`), not nohup — field testing showed backgrounded
+  processes SIGHUP'd on ssh disconnect and ssh exiting 255 while holding the pipe.
+- nginx on **:8000** (the platform's observed default target) bridges to the app AND enforces the
+  **operator plane at the edge**: `/admin` and `/api/admin` return 401 without the per-app
+  credentials generated at `vm.secrets` — so a forgetful generation cannot fail open. The exe-auth
+  skill additionally requires in-app gating (defense in depth) and forbids unauthenticated
+  bulk-data routes anywhere.
+- `proxy.pin` is a **standalone idempotent step** (`ssh exe.dev share port <app> 8000`) so a
+  failure in app.start on a previous attempt can never leave the proxy unpinned silently.
+- `verify.live` is 4 levels, each isolating a failure mode: L1 app on $PORT · L2 edge bridge on
+  :8000 · L3 **/admin must be 401 unauthenticated and not-401 with credentials** · L4 external https.
+- Visibility: apps are **private by default** (exe.dev login on everything); `--public` opens the
+  public plane while /admin* stays gated.
+
+**North star (platform ask, HARNESS-7):** path-scoped exe.dev identity — "require exe.dev login
+for /admin* even on a public VM" — would replace the shared basic-auth password with real,
+revocable, per-user platform SSO. exe.dev's HTTPS-API docs invite permission requests at
+support@exe.dev / their Discord; worth sending. Until then: basic auth at the edge, credentials in
+`state/<app>.json`, rotatable by clearing `vm.secrets` + `edge.auth` steps and re-running.
 
 ## 6. Teardown (cheap, ordered, re-runnable)
 

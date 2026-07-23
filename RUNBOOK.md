@@ -45,11 +45,13 @@ What you'll see, in order (each step is persisted to `state/todo-cats.json`):
 | `db.branch` | `pscale branch create apps todo-cats --wait` — this branch **is** the app's isolated DB | `pscale branch list apps` |
 | `db.roles` | `todo-cats-migrate` (DDL, inherits `postgres`) + `todo-cats-runtime` (DML-only) | `pscale role list apps todo-cats` |
 | `vm.secrets` | `~/app/.env` on the VM (0600): `PORT`, `DATABASE_URL` (:6432 pooled), `DIRECT_DATABASE_URL` (:5432), LLM key | `ssh todo-cats.exe.xyz cat ~/app/.env` |
-| `app.generate` | embedded Pi runs **in the VM** with `.pi/` skills + the port-contract extension; streams output | log: `~/app/.agentrunner/session.log` |
-| `db.migrate` | `prisma migrate diff --from-config-datasource --to-schema ... --script` → `prisma db execute` over the **direct** URL | exit-code 0 next run = in sync |
+| `app.generate` | ensures **Node 22** on the VM (Pi requires it), then embedded Pi runs **in the VM** with `vm/.pi` skills + port-contract extension; streams output | log: `~/app/.agentrunner/session.log` |
+| `db.migrate` | `prisma migrate diff` → `db execute` over the **direct** URL; flags auto-match the installed Prisma major (standard pin: 6.19.3) | exit-code 0 next run = in sync |
 | `db.promote` | MCP `planetscale_get_branch_schema` verification (Postgres has no deploy requests — PLAN.md §0.1; a NOTICE is printed) | |
-| `app.start` | `npm start` under nohup; **explicit** `ssh exe.dev share port todo-cats 8080`; `share set-public` if `--public` | `ssh exe.dev share show todo-cats` |
-| `verify.live` | level 1: in-VM `curl localhost:8080/healthz`; level 2: `https://todo-cats.exe.xyz/` | open the URL |
+| `app.start` | systemd unit `app` (Restart=always, EnvironmentFile=~/app/.env, logs → ~/app/app.log) | `systemctl status app` on the VM |
+| `edge.auth` | nginx :8000 → 127.0.0.1:8080; `/admin` + `/api/admin` gated by basic auth (creds generated at vm.secrets, in `state/<app>.json`) | `curl -i localhost:8000/admin` on the VM → 401 |
+| `proxy.pin` | standalone: `ssh exe.dev share port todo-cats 8000`; `share set-public` if `--public` | `ssh exe.dev share show todo-cats` |
+| `verify.live` | L1 app :8080 · L2 edge :8000 · L3 /admin fails closed (401 unauth, not-401 with creds) · L4 external https | open the URL |
 
 Success line: `✅ todo-cats is live: https://todo-cats.exe.xyz`.
 
@@ -61,8 +63,11 @@ step and a remedy; fix and re-run the same command. To force a step to re-run, d
 
 ### Common failures (all fail loudly)
 
-- **`verify.live` level 1 fails** → the app isn't on the contracted port. `ssh todo-cats.exe.xyz 'tail -50 ~/app/app.log; ss -tlnp'`. The port-contract extension should have prevented hardcoded ports; if the app crashed, fix and `re-run provision` (app.start re-executes if you clear its state entry).
-- **`verify.live` level 2 fails** → proxy target drifted. `ssh exe.dev share port todo-cats 8080`.
+- **`verify.live` L1 fails** → app down or wrong port. `ssh todo-cats.exe.xyz 'systemctl status app --no-pager; tail -50 ~/app/app.log; ss -tlnp'`.
+- **`verify.live` L2 fails** → nginx edge broken. `ssh todo-cats.exe.xyz 'sudo nginx -t; systemctl status nginx --no-pager'`.
+- **`verify.live` L3 fails** → operator plane failing open (or operator lockout). Clear `edge.auth` in `state/<app>.json` and re-run provision; creds live in that state file.
+- **`verify.live` L4 fails** → platform proxy target drifted. `ssh exe.dev share port todo-cats 8000`.
+- **Rotate admin credentials** → delete `admin` + the `vm.secrets` and `edge.auth` step entries in `state/<app>.json`, re-run provision.
 - **`db.roles` fails with "Could not extract role credentials"** → `pscale` JSON shape changed; the error prints the keys received; adjust `extractRoleCred()` in `src/planetscale.ts` (marked PLACEHOLDER-VERIFY).
 - **`db.migrate` permission denied for schema public** → migration ran as the runtime role; check `DIRECT_DATABASE_URL` uses the `-migrate` role (docs: `pg_write_all_data` grants no DDL).
 

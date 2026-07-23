@@ -44,16 +44,19 @@ const prompt = `Build a full-stack web app in the current directory (~/app). App
 
 ${idea}
 
-Hard requirements (the "exe-app" and "planetscale-prisma" skills have details — read them):
+Hard requirements (the "exe-app", "planetscale-prisma", and "exe-auth" skills have details — read them):
 - Node.js + npm. package.json MUST have a "start" script that runs the production server.
-- The HTTP server MUST listen on process.env.PORT (currently ${port}) on 0.0.0.0. Never hardcode a port.
-- Expose GET /healthz returning 200 "ok".
-- Persistence: PlanetScale Postgres via Prisma. Write prisma/schema.prisma (source of truth) and
-  prisma.config.ts using env("DIRECT_DATABASE_URL") for the CLI datasource. The runtime client must
-  connect using DATABASE_URL (PgBouncer :6432). Do NOT run migrations yourself — the harness does.
-- If the app needs user accounts/login/per-user data: use "Login with exe" per the exe-auth skill
-  (proxy-injected X-ExeDev-UserID/X-ExeDev-Email headers + /__exe.dev/login redirect). Never build
-  password auth or third-party OAuth.
+- The HTTP server MUST listen on process.env.PORT (currently ${port}) on 127.0.0.1 (an nginx edge
+  fronts it). Never hardcode a port.
+- Expose GET /healthz returning 200 "ok" (unauthenticated).
+- AUTH IS NOT OPTIONAL: mount every admin/dashboard/bulk-data/export/destructive route under
+  /admin or /api/admin and gate it on ADMIN_USER/ADMIN_PASSWORD from the environment (see exe-auth
+  skill). Never emit an unauthenticated route that returns other users' data.
+- Persistence: PlanetScale Postgres via Prisma pinned EXACTLY at 6.19.3 (prisma + @prisma/client).
+  Write prisma/schema.prisma (source of truth) with url = env("DATABASE_URL") and
+  directUrl = env("DIRECT_DATABASE_URL"). No prisma.config.ts. Do NOT run migrations — the harness does.
+- Per-user identity (if needed): "Login with exe" headers per the exe-auth skill. Never password
+  auth or third-party OAuth.
 - Read config ONLY from environment variables (a ~/app/.env exists; never print or commit it).
 - Install dependencies you add (npm install) and make sure "npm start" works.`;
 

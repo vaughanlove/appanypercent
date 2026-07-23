@@ -5,9 +5,20 @@ PlanetScale Postgres branch — provisioned, generated (by an embedded [Pi](http
 running inside the VM), migrated, and verified, in one command.
 
 ```
-idea ──▶ exe.dev micro-VM ──▶ PlanetScale branch + 2 scoped roles ──▶ secrets ──▶ Pi generates app
-     ──▶ prisma migrate (direct :5432) ──▶ MCP schema verify ──▶ proxy pinned to PORT ──▶ live ✅
+idea ──▶ exe.dev micro-VM ──▶ PlanetScale branch + 2 scoped roles ──▶ secrets (+admin creds) ──▶ Pi generates app
+     ──▶ prisma migrate (direct :5432) ──▶ MCP schema verify ──▶ systemd ──▶ nginx edge (auth) ──▶ proxy pin ──▶ live ✅
+
+request path:  exe.dev :443 ─▶ VM :8000 nginx (gates /admin*) ─▶ 127.0.0.1:$PORT app
 ```
+
+**Visibility & auth defaults (important):**
+- Apps are **PRIVATE by default** — every route needs an exe.dev login. For a public-facing app
+  (a store, a landing page) pass `--public` at provision time (or later:
+  `ssh exe.dev share set-public <app>`).
+- Public or private, the **operator plane fails closed**: `/admin` and `/api/admin` are gated at
+  an nginx edge with per-app generated credentials (`ADMIN_USER`/`ADMIN_PASSWORD`, stored in
+  `state/<app>.json` and the VM's `.env`), verify enforces "/admin without creds == 401", and the
+  generator is instructed to never emit unauthenticated bulk-data routes.
 
 ## Install (2 commands)
 

@@ -14,6 +14,8 @@ export interface AppState {
   branchId?: string;
   roles?: { migrate?: { id: string; name: string }; runtime?: { id: string; name: string } };
   urls?: { direct?: string; pooled?: string };
+  /** Operator-plane credentials (HARNESS-2): enforced at the nginx edge + in-app. */
+  admin?: { user: string; password: string };
   steps: Record<string, { done: boolean; at: string; note?: string }>;
 }
 

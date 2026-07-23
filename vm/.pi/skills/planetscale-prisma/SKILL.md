@@ -1,6 +1,6 @@
 ---
 name: planetscale-prisma
-description: Conventions for PlanetScale Postgres + Prisma in harness-provisioned apps — schema.prisma as source of truth, direct vs pooled connection strings, prisma.config.ts. Use when touching the database layer, Prisma schema, or DB config.
+description: Conventions for PlanetScale Postgres + Prisma in harness-provisioned apps — exact Prisma 6 pin, schema.prisma as source of truth, direct vs pooled connection strings. Use when touching the database layer, Prisma schema, or DB config.
 ---
 
 # PlanetScale Postgres + Prisma conventions
@@ -15,27 +15,29 @@ Two connection strings exist in `~/app/.env` — they have different jobs:
 
 ## Hard rules
 
-1. `prisma/schema.prisma` is the source of truth for the schema. Model everything there.
-2. Do NOT run `prisma migrate dev` / `migrate deploy` / `db push` — the harness applies migrations
-   (`migrate diff` → `db execute` over the direct connection). Just write the schema, then run
-   `npx prisma generate` if you need the client for type-checking.
-3. Create `prisma.config.ts` exactly like this (Prisma v7 + PlanetScale docs pattern), so CLI
-   operations use the direct connection:
+1. Pin Prisma EXACTLY in package.json (no caret — the harness's migrate commands are written
+   against this version's CLI flags):
 
-   ```ts
-   import "dotenv/config";
-   import { defineConfig, env } from "prisma/config";
-
-   export default defineConfig({
-     schema: "prisma/schema.prisma",
-     migrations: { path: "prisma/migrations" },
-     datasource: { url: env("DIRECT_DATABASE_URL") },
-   });
+   ```json
+   "dependencies": { "@prisma/client": "6.19.3" },
+   "devDependencies": { "prisma": "6.19.3" }
    ```
 
-4. The runtime client must connect via `DATABASE_URL` (PgBouncer). PgBouncer runs in transaction
-   pooling mode: no session state (`SET`, advisory locks held across transactions, LISTEN/NOTIFY).
-   Prefer Prisma Client (check the installed Prisma major version's docs for the current
-   PostgreSQL adapter setup) or `pg` Pool with `connectionString: process.env.DATABASE_URL`.
+2. `prisma/schema.prisma` is the source of truth. Datasource block exactly:
+
+   ```prisma
+   datasource db {
+     provider  = "postgresql"
+     url       = env("DATABASE_URL")          // runtime: PgBouncer :6432
+     directUrl = env("DIRECT_DATABASE_URL")   // prisma CLI: direct :5432
+   }
+   ```
+
+   Do NOT create a `prisma.config.ts` (that's the Prisma 7 pattern; we're on 6).
+3. Do NOT run `prisma migrate dev` / `migrate deploy` / `db push` — the harness applies the schema
+   (`migrate diff --from-url ... --to-schema-datamodel ...` → `db execute --url ...` over the
+   direct connection). Just write the schema; run `npx prisma generate` for the typed client.
+4. Runtime: `new PrismaClient()` (it reads `DATABASE_URL`). PgBouncer runs transaction pooling:
+   no session state (`SET`, session advisory locks, LISTEN/NOTIFY).
 5. TLS is mandatory; the URLs already carry `sslmode=verify-full`. Never edit or log them.
 6. Every table needs a primary key. Keep the schema in the default `postgres` database, `public` schema.

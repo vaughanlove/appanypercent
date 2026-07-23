@@ -1,53 +1,56 @@
 ---
 name: exe-auth
-description: Authentication for apps behind the exe.dev proxy — use "Login with exe" identity headers, never passwords or third-party OAuth. Use whenever the app needs user accounts, login, sessions, or per-user data.
+description: Authentication for apps behind the exe.dev proxy — two-plane model (public vs operator), Login-with-exe identity headers, ADMIN_USER/ADMIN_PASSWORD gating for admin and data routes. Use whenever the app has user accounts, admin pages, data listing/export APIs, or destructive actions.
 ---
 
-# Authentication: use "Login with exe" (exe.dev's recommended pattern)
+# Authentication: two planes, fails closed
 
-This app runs behind the exe.dev HTTPS proxy, which provides authentication as a platform
-feature (https://exe.dev/docs/login-with-exe). Do NOT build password auth, do NOT integrate
-third-party OAuth providers, do NOT add heavyweight auth frameworks by default.
+Every app has two planes. Design routes into one of them EXPLICITLY, before writing handlers:
 
-## How it works
+| Plane | Examples | Protection |
+|---|---|---|
+| **Public** | landing page, submit-a-thing forms, per-user pages | none, or per-user identity (below) |
+| **Operator/admin** | dashboards, order/user lists, ANY route that reads bulk data, exports, deletes | **required, by construction** |
 
-When a user is authenticated with exe.dev, the proxy injects trusted headers into every request:
+The #1 observed failure: an unauthenticated `GET /api/orders` returning all customer PII on a
+public app. Never emit a route that reads other users' data without protection.
 
-- `X-ExeDev-UserID` — stable, unique user identifier (use this as your foreign key)
-- `X-ExeDev-Email` — the user's email address
+## Operator plane (MANDATORY rules)
 
-These headers are only present when the user is authenticated. On a **private** proxy (default)
-every request has them. On a **public** proxy, anonymous requests won't have them — send users
-who need to log in to:
+- Mount ALL admin/operator routes under `/admin` (pages) and `/api/admin` (APIs). The platform
+  enforces HTTP Basic auth on exactly these prefixes at an nginx edge in front of the app — using
+  a conventional prefix is what makes the edge gate cover you.
+- ADDITIONALLY gate them in-app (defense in depth): check HTTP Basic credentials against
+  `process.env.ADMIN_USER` / `process.env.ADMIN_PASSWORD` (always present in `.env`), constant-time
+  compare, else `401` with `WWW-Authenticate: Basic realm="operator"`.
+- Bulk reads/exports/deletes that don't feel like "admin pages" are STILL operator plane — put them
+  under `/api/admin/...`.
+- `GET /healthz` stays unauthenticated and outside `/admin`.
 
-- Login: redirect to `/__exe.dev/login?redirect={path-to-return-to}`
-- Logout: `POST /__exe.dev/logout` (e.g. a form button)
+## Public plane per-user identity: "Login with exe"
 
-## Implementation pattern
+exe.dev's proxy injects trusted headers on authenticated requests (https://exe.dev/docs/login-with-exe):
 
-1. Middleware reads the headers into `req.user = { id, email }` (or equivalent).
-2. Persist users lazily in Prisma, keyed on the stable ID:
+- `X-ExeDev-UserID` — stable unique ID (use as the foreign key) · `X-ExeDev-Email`
+- Login: redirect to `/__exe.dev/login?redirect={path}` · Logout: `POST /__exe.dev/logout`
 
-   ```prisma
-   model User {
-     id        String   @id            // X-ExeDev-UserID
-     email     String
-     createdAt DateTime @default(now())
-   }
-   ```
+Pattern: middleware reads headers into `req.user`; lazy Prisma upsert:
 
-   Upsert on first authenticated request; reference `User.id` from user-owned rows.
-3. Routes needing identity: if the headers are absent, redirect (HTML) to
-   `/__exe.dev/login?redirect=<original path>` or return 401 (API).
-4. `GET /healthz` must stay unauthenticated.
+```prisma
+model User {
+  id        String   @id            // X-ExeDev-UserID
+  email     String
+  createdAt DateTime @default(now())
+}
+```
+
+On a PRIVATE app every request has these headers. On a PUBLIC app anonymous requests won't —
+redirect to the login URL (HTML) or 401 (API) when identity is required.
 
 ## Rules
 
-- No password storage, no session cookies of your own, no JWT issuing — the proxy owns authn.
-  Your job is only authorization (which user may do what) using the header identity.
-- Only trust these headers on requests arriving via the exe.dev proxy (which controls them).
-  For local testing without the proxy, inject them with a dev reverse proxy, e.g.:
+- No password storage, no self-managed sessions/JWTs, no third-party OAuth. The proxy owns user
+  authn; ADMIN_USER/ADMIN_PASSWORD owns the operator plane.
+- Only trust the X-ExeDev-* headers via the exe.dev proxy. Local testing: inject with
   `mitmdump --mode reverse:http://localhost:8000 --listen-port 3000 --set modify_headers='/~q/X-Exedev-Email/user@example.com' --set modify_headers='/~q/X-Exedev-Userid/usr1234'`
-- Only if the operator EXPLICITLY asks for app-managed accounts independent of exe.dev
-  (e.g. public signup with its own user base) may you add an auth framework such as better-auth —
-  and even then, check its current docs rather than assuming API shapes.
+- App-managed accounts (e.g. better-auth) only if the operator EXPLICITLY requests them.

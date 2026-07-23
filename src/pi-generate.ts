@@ -8,6 +8,9 @@
  */
 import { vmRun, vmSync } from "./exedev.ts";
 import { fatal, info } from "./log.ts";
+
+/** Exact Prisma pin the harness's migrate commands are written against (HARNESS-5). */
+export const PRISMA_PIN = "6.19.3";
 import type { Config } from "./config.ts";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -17,13 +20,24 @@ export function generateApp(cfg: Config): void {
     fatal("app.generate", "No --idea provided and app not yet generated.", 'Re-run with --idea "your app idea".');
   }
 
-  // 1) Ensure node is available in the VM (exeuntu is Ubuntu-based; loud if this fails).
+  // 1) HARNESS-1: Pi requires Node >= 22 (pi-tui uses /v regex flags; observed failure on the
+  //    image's Node 18: "SyntaxError: Invalid regular expression flags" + EBADENGINE >=22.19.0).
+  //    Install Node 22 via NodeSource if the VM's node is missing or too old, then ASSERT.
   vmRun(
     "app.generate",
     cfg.app,
-    "command -v node >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq nodejs npm)",
+    `node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' 2>/dev/null || { curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs; }`,
     { timeoutMs: 10 * 60 * 1000 },
   );
+  const nodeV = vmRun("app.generate", cfg.app, "node -v").stdout.trim();
+  if (Number(nodeV.replace(/^v/, "").split(".")[0]) < 22) {
+    fatal(
+      "app.generate",
+      `VM node is ${nodeV}; the embedded Pi generator requires Node >= 22.`,
+      `ssh ${cfg.app}.exe.xyz 'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs'`,
+    );
+  }
+  info(`VM node ${nodeV} (>= 22 OK)`);
 
   // 2) Ship the agent runner + our .pi extensions/skills into ~/app.
   vmRun("app.generate", cfg.app, "mkdir -p ~/app");
@@ -48,16 +62,17 @@ export function generateApp(cfg: Config): void {
   );
 
   // 5) Contract check: the generated app must exist and declare a start script + schema.prisma.
+  //    (prisma.config.ts intentionally NOT required — we standardize on Prisma 6, HARNESS-5.)
   const check = vmRun(
     "app.generate",
     cfg.app,
-    "test -f ~/app/package.json && test -f ~/app/prisma/schema.prisma && test -f ~/app/prisma.config.ts && node -e \"const p=require(process.env.HOME+'/app/package.json'); if(!p.scripts||!p.scripts.start) process.exit(1)\"",
+    "test -f ~/app/package.json && test -f ~/app/prisma/schema.prisma && node -e \"const p=require(process.env.HOME+'/app/package.json'); if(!p.scripts||!p.scripts.start) process.exit(1)\"",
     { allowFail: true },
   );
   if (check.status !== 0) {
     fatal(
       "app.generate",
-      "Generated app is missing package.json with a `start` script, prisma/schema.prisma, or prisma.config.ts.",
+      "Generated app is missing package.json with a `start` script or prisma/schema.prisma.",
       `Inspect the VM: ssh ${cfg.app}.exe.xyz — the Pi session log is at ~/app/.agentrunner/session.log`,
     );
   }

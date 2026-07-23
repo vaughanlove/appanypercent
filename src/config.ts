@@ -13,6 +13,13 @@ export interface Config {
 
 export const DEFAULT_PORT = 8080;
 
+/**
+ * The port story (HARNESS-4), one coherent chain:
+ *   exe.dev :443 ──▶ VM :8000 (nginx edge: admin-plane basic-auth gate) ──▶ 127.0.0.1:$PORT (app)
+ * EDGE_PORT is what `share port` pins the exe.dev proxy to; the app itself binds $PORT on loopback.
+ */
+export const EDGE_PORT = 8000;
+
 export function loadConfig(args: Record<string, string | boolean>): Config {
   const app = String(args.app ?? "");
   if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(app)) {
