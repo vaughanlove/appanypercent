@@ -51,6 +51,9 @@ Hard requirements (the "exe-app" and "planetscale-prisma" skills have details â€
 - Persistence: PlanetScale Postgres via Prisma. Write prisma/schema.prisma (source of truth) and
   prisma.config.ts using env("DIRECT_DATABASE_URL") for the CLI datasource. The runtime client must
   connect using DATABASE_URL (PgBouncer :6432). Do NOT run migrations yourself â€” the harness does.
+- If the app needs user accounts/login/per-user data: use "Login with exe" per the exe-auth skill
+  (proxy-injected X-ExeDev-UserID/X-ExeDev-Email headers + /__exe.dev/login redirect). Never build
+  password auth or third-party OAuth.
 - Read config ONLY from environment variables (a ~/app/.env exists; never print or commit it).
 - Install dependencies you add (npm install) and make sure "npm start" works.`;
 

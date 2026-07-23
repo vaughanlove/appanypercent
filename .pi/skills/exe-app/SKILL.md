@@ -23,3 +23,5 @@ proxy on :443 and forwards to ONE port inside this VM. The provisioning harness 
 4. No TLS in-app; the proxy owns certificates.
 5. If using Next.js/Vite dev tooling, remember the public hostname is `<vmname>.exe.xyz`
    (`allowedDevOrigins` / `server.allowedHosts`) — but production `npm start` should not be a dev server.
+6. User accounts/login: see the `exe-auth` skill — exe.dev provides authentication at the proxy
+   ("Login with exe" headers); never roll your own.
