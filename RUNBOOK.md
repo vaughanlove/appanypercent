@@ -51,7 +51,7 @@ Success line: `✅ todo-cats is live: https://todo-cats.exe.xyz`.
 
 `provision` is idempotent: completed steps are skipped. If it dies mid-flight, the failure names the
 step and a remedy; fix and re-run the same command. To force a step to re-run, delete its entry from
-`state/<app>.json`. `npm run status -- --app todo-cats` dumps the state record.
+`state/<app>.json`. `npm run status -- --app todo-cats` dumps the state record. New here? Run `npm run doctor` first and `npm run plan` for a dry run — see README.md.
 
 ### Common failures (all fail loudly)
 
