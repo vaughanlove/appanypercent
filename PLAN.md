@@ -45,6 +45,18 @@ Pi docs (`@earendil-works/pi-coding-agent` v0.81.1).
 5. **How exe.dev `--env` vars are exposed inside the VM is not precisely documented.** We therefore do
    not rely on it for secrets; secrets are written over SSH to `~/app/.env` (mode 0600). See §3.
 
+6. **PlanetScale publishes an official agent-setup flow** (`/docs/agent-setup/prompt`): `pscale` 0.292.0+
+   ships `pscale auth check --format json` (the documented auth probe, used by our doctor),
+   `pscale agent-guide --format json` (machine-readable CLI conventions), and an official skills repo
+   (github.com/planetscale/skills, Agent Skills format — Pi-compatible). Conventions we follow from it:
+   always `--format json` in automation; `--org` on resource subcommands (not root); pass service-token
+   flags explicitly in headless mode; never retry commands documented as unavailable under service
+   tokens (`org show`, `service-token list`, …).
+   **Deliberate non-adoption:** we do NOT install planetscale/skills into the in-VM Pi session — those
+   skills are for operating the PlanetScale control plane (assessments, Insights, safety review), and
+   the app VM intentionally has no `pscale` binary or control-plane token (§3 blast radius). Operators
+   using Pi/Claude/Cursor interactively can install them globally per that doc; it doesn't touch this repo.
+
 ## 1. Why a small TypeScript CLI (not a bash script)
 
 - Pi is embedded via its TypeScript SDK, so Node/TS is already required.

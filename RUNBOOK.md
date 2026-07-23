@@ -4,7 +4,9 @@
 
 1. **exe.dev** — the API is SSH. Verify: `ssh exe.dev ls --json` (register your SSH key at exe.dev
    first if this prompts).
-2. **PlanetScale** — install `pscale`, then either `pscale auth login` (interactive) or headless:
+2. **PlanetScale** — install `pscale` **0.292.0+** (`brew install pscale`; verify with
+   `pscale auth check --format json`, the documented agent auth probe — see
+   https://planetscale.com/docs/agent-setup/prompt), then either `pscale auth login` (interactive) or headless:
    ```bash
    export PLANETSCALE_SERVICE_TOKEN_ID=...   # service token with branch/role/DR access
    export PLANETSCALE_SERVICE_TOKEN=...

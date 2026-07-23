@@ -55,11 +55,39 @@ export async function doctor(): Promise<void> {
     );
   }
 
-  // 3. PlanetScale CLI + org/database ----------------------------------------
+  // 3. PlanetScale CLI + auth + org/database -----------------------------------
+  // Follows the documented agent flow (https://planetscale.com/docs/agent-setup/prompt):
+  // `pscale auth check --format json` is the auth probe; pass service-token flags explicitly;
+  // never retry commands that fail by design under service tokens.
   const psOrg = process.env.PS_ORG ?? "";
   const psDb = process.env.PS_DATABASE ?? "";
+  const tokenFlags =
+    process.env.PLANETSCALE_SERVICE_TOKEN_ID && process.env.PLANETSCALE_SERVICE_TOKEN
+      ? ["--service-token-id", process.env.PLANETSCALE_SERVICE_TOKEN_ID, "--service-token", process.env.PLANETSCALE_SERVICE_TOKEN]
+      : [];
+  let psAuthOk = false;
   if (!have("pscale")) {
-    fail("pscale", "not found in PATH", "Install the PlanetScale CLI: https://planetscale.com/docs/cli — then `pscale auth login` or set PLANETSCALE_SERVICE_TOKEN_ID/_TOKEN.");
+    fail("pscale", "not found in PATH", "Install the PlanetScale CLI (0.292.0+): https://planetscale.com/docs/cli — then `pscale auth login` or set PLANETSCALE_SERVICE_TOKEN_ID/_TOKEN.");
+  } else {
+    const v = run("doctor", "pscale", ["version", "--format", "json"], { allowFail: true, timeoutMs: 15_000 });
+    const m = v.stdout.match(/(\d+)\.(\d+)\.(\d+)/);
+    if (m && (Number(m[1]) > 0 || Number(m[2]) >= 292)) ok("pscale version", m[0]);
+    else warn("pscale version", m ? `${m[0]} (< 0.292.0)` : "could not parse", "brew upgrade pscale — 0.292.0+ adds the `auth check`/`agent-guide` agent automation this doctor uses (docs/agent-setup/prompt).");
+
+    const auth = run("doctor", "pscale", ["auth", "check", "--format", "json", ...tokenFlags], { allowFail: true, timeoutMs: 30_000 });
+    let status = "";
+    try { status = JSON.parse(auth.stdout)?.status ?? ""; } catch { /* older CLI without auth check */ }
+    psAuthOk = auth.status === 0 && status !== "action_required";
+    if (psAuthOk) ok("pscale auth", status || "authenticated");
+    else
+      fail(
+        "pscale auth",
+        status || "auth check failed",
+        "Follow `issues`/`next_steps` from `pscale auth check --format json` — typically `pscale auth login` or service-token flags. Note: some commands are unavailable by design under service tokens; don't retry those (docs/agent-setup/prompt).",
+      );
+  }
+  if (!psAuthOk) {
+    // skip org/database probes — they'd only add noise
   } else if (!psOrg || !psDb) {
     fail(
       "planetscale config",
@@ -67,13 +95,13 @@ export async function doctor(): Promise<void> {
       "export PS_ORG=<org> PS_DATABASE=<postgres-db> — create the parent Postgres database once in the PlanetScale dashboard (leave `main` empty).",
     );
   } else {
-    const db = run("doctor", "pscale", ["database", "show", psDb, "--org", psOrg, "--format", "json"], {
+    const db = run("doctor", "pscale", ["database", "show", psDb, "--org", psOrg, "--format", "json", ...tokenFlags], {
       allowFail: true,
       timeoutMs: 30_000,
     });
     if (db.status === 0) {
       ok("planetscale", `auth OK, database ${psOrg}/${psDb} exists`);
-      const br = run("doctor", "pscale", ["branch", "list", psDb, "--org", psOrg, "--format", "json"], {
+      const br = run("doctor", "pscale", ["branch", "list", psDb, "--org", psOrg, "--format", "json", ...tokenFlags], {
         allowFail: true,
         timeoutMs: 30_000,
       });
@@ -89,8 +117,8 @@ export async function doctor(): Promise<void> {
     } else {
       fail(
         "planetscale",
-        `cannot access ${psOrg}/${psDb}`,
-        "Auth: `pscale auth login`, or export PLANETSCALE_SERVICE_TOKEN_ID + PLANETSCALE_SERVICE_TOKEN. Also verify the database exists and is a Postgres database.",
+        `authenticated, but cannot access ${psOrg}/${psDb}`,
+        `Verify the database exists and is Postgres, and that the token has access: pscale database show ${psDb} --org ${psOrg} --format json`,
       );
     }
   }
