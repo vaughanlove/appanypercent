@@ -1,0 +1,23 @@
+{
+  "name": "appanypercent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Provisioning pipeline: idea -> live appname.exe.xyz backed by an isolated PlanetScale Postgres branch",
+  "scripts": {
+    "provision": "tsx src/cli.ts provision",
+    "teardown": "tsx src/cli.ts teardown",
+    "verify": "tsx src/cli.ts verify",
+    "status": "tsx src/cli.ts status"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "appanypercent-agent-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runs an embedded Pi session inside the app VM to generate the app + schema.prisma. Pi is a pinned dependency (no fork).",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.81.1"
+  }
+}
