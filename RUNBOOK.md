@@ -2,6 +2,10 @@
 
 ## One-time operator setup (control machine, never on VMs)
 
+> **Shortcut:** `./fresh-install.sh` automates all of the below (installs pscale, registers your
+> SSH key with exe.dev, prompts config/secrets into `./.env`, runs doctor). Idempotent. The manual
+> steps follow for reference / debugging:
+
 1. **exe.dev** — the API is SSH. Verify: `ssh exe.dev ls --json` (register your SSH key at exe.dev
    first if this prompts).
 2. **PlanetScale** — install `pscale` **0.292.0+** (`brew install pscale`; verify with

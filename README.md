@@ -9,30 +9,28 @@ idea ──▶ exe.dev micro-VM ──▶ PlanetScale branch + 2 scoped roles �
      ──▶ prisma migrate (direct :5432) ──▶ MCP schema verify ──▶ proxy pinned to PORT ──▶ live ✅
 ```
 
-## Quickstart (5 steps)
+## Quickstart
 
 ```bash
-git clone <this repo> && cd appanypercent && npm install
-
-# one-time environment (see RUNBOOK.md for details)
-export PS_ORG=<your-planetscale-org>
-export PS_DATABASE=<parent-postgres-db>          # create once in PlanetScale, leave `main` empty
-export PLANETSCALE_SERVICE_TOKEN_ID=... PLANETSCALE_SERVICE_TOKEN=...
-export PLANETSCALE_API_TOKEN="$PLANETSCALE_SERVICE_TOKEN"   # optional: MCP schema verification
-export ANTHROPIC_API_KEY=...                     # LLM key for the in-VM Pi generation step
-
-npm run doctor                                   # 1. preflight — fix anything marked ✗
-npm run plan -- --app demo --idea "a guestbook"  # 2. dry run — prints every command, runs nothing
-npm run provision -- --app demo --idea "a guestbook" --public   # 3. the real thing (~minutes)
-open https://demo.exe.xyz                        # 4. it's live
-npm run teardown -- --app demo                   # 5. destroy VM + branch + roles, ~free
+git clone <this repo> && cd appanypercent
+./fresh-install.sh                               # 0. one-command setup: deps, pscale, exe.dev key,
+                                                 #    prompts for config -> ./.env, then runs doctor
+npm run plan -- --app demo --idea "a guestbook"  # 1. dry run — prints every command, runs nothing
+npm run provision -- --app demo --idea "a guestbook" --public   # 2. the real thing (~minutes)
+open https://demo.exe.xyz                        # 3. it's live
+npm run teardown -- --app demo                   # 4. destroy VM + branch + roles, ~free
 ```
+
+`fresh-install.sh` is idempotent — re-run it after fixing anything; it keeps existing answers
+(stored in `./.env`, gitignored, chmod 600, auto-loaded by the CLI; real env vars always win).
+Prefer manual setup? Export the env vars listed in `npx tsx src/cli.ts` help and run `npm run doctor`.
 
 Run `npx tsx src/cli.ts` with no arguments any time to see the walkthrough again.
 
 ## What you'll see
 
-`npm run doctor` (start here — every ✗ comes with a copy-pasteable remedy):
+`./fresh-install.sh` walks tooling → exe.dev key registration → config prompts → PlanetScale auth,
+then hands off to `npm run doctor` (the source of truth — every ✗ comes with a copy-pasteable remedy):
 
 ```
 appanypercent doctor — checking everything provisioning needs
@@ -62,7 +60,9 @@ Failures are loud and step-attributed with a remedy line — never a silent hang
 
 A ladder, cheapest first:
 
-1. **Free, offline:** `npm test` — runs `doctor` + a dry-run `plan`. Also:
+1. **Free, offline:** `npm test` — runs `doctor` + a dry-run `plan`. The installer itself can be
+   tested without touching your system: stub `pscale` on PATH and pipe `</dev/null` (non-interactive
+   mode skips prompts and registration). Also:
    `npm run plan -- --app demo --idea "x"` works even before any credentials are set
    (placeholders shown), so you can inspect exactly what would execute.
 2. **Free, read-only against real services:** `npm run doctor` — authenticates to exe.dev and

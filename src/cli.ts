@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+import { loadDotEnv } from "./env.ts";
+loadDotEnv(); // ./.env (written by fresh-install.sh) fills env gaps; real env wins
+
 import { loadConfig } from "./config.ts";
 import { loadState } from "./state.ts";
 import { fatal } from "./log.ts";
@@ -27,7 +30,8 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const usage = `${bold("appanypercent")} — app idea -> live <name>.exe.xyz backed by an isolated PlanetScale Postgres branch
 
 ${bold("walkthrough (in order):")}
-  1. npm run doctor                                        ${dim("preflight: checks ssh/exe.dev, pscale, tokens — start here")}
+  0. ./fresh-install.sh                                    ${dim("one-command setup: deps, pscale, exe.dev key, .env config, doctor")}
+  1. npm run doctor                                        ${dim("preflight: checks ssh/exe.dev, pscale, tokens — rerun any time")}
   2. npm run plan      -- --app demo --idea "a guestbook"  ${dim("dry run: prints every command, executes nothing")}
   3. npm run provision -- --app demo --idea "a guestbook" --public
   4. open https://demo.exe.xyz
@@ -42,7 +46,7 @@ ${bold("commands:")}
   status     --app <name>                      dump the persisted per-step provisioning state
   teardown   --app <name>                      destroy everything for this app (idempotent)
 
-${bold("environment:")}
+${bold("environment:")} ${dim("(auto-loaded from ./.env — written by fresh-install.sh; real env vars win)")}
   PS_ORG, PS_DATABASE                          PlanetScale org + parent Postgres database (branch parent)
   PLANETSCALE_SERVICE_TOKEN_ID / _TOKEN        headless pscale auth (or \`pscale auth login\`)
   PLANETSCALE_API_TOKEN                        hosted MCP schema verification (optional, warns if absent)
