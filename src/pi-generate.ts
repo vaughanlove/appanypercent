@@ -27,8 +27,10 @@ export function generateApp(cfg: Config): void {
 
   // 2) Ship the agent runner + our .pi extensions/skills into ~/app.
   vmRun("app.generate", cfg.app, "mkdir -p ~/app");
+  // NOTE: only vm/.pi is shipped — the operator-side .pi/ (provisioning tools) must NEVER
+  // reach a VM: the VM has no pscale/exe.dev credentials and that's the security boundary.
   vmSync("app.generate", cfg.app, `${repoRoot}agent`, "~/app/.agentrunner");
-  vmSync("app.generate", cfg.app, `${repoRoot}.pi`, "~/app/.pi");
+  vmSync("app.generate", cfg.app, `${repoRoot}vm/.pi`, "~/app/.pi");
 
   // 3) Install the pinned Pi dependency on the VM.
   vmRun("app.generate", cfg.app, "cd ~/app/.agentrunner && npm install --no-audit --no-fund", {

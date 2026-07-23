@@ -29,14 +29,13 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
 const usage = `${bold("appanypercent")} — app idea -> live <name>.exe.xyz backed by an isolated PlanetScale Postgres branch
 
-${bold("walkthrough (in order):")}
+${bold("walkthrough:")}
   1. appanypercent setup                                     ${dim("one-time: pscale, exe.dev key, config -> .env, doctor")}
-  2. appanypercent plan --app demo --idea "a guestbook"      ${dim("dry run: prints every command, executes nothing")}
-  3. appanypercent provision --app demo --idea "a guestbook" --public
-  4. open https://demo.exe.xyz
-  5. appanypercent teardown --app demo                       ${dim("deletes VM + DB branch + roles; safe on half-provisioned apps")}
+  2. appanypercent                                           ${dim("opens the interactive harness (Pi) — just describe the app you want")}
+     ${dim('e.g. "provision a guestbook called demo and make it public", "is demo healthy?", "tear demo down"')}
 
-${bold("commands:")}
+${bold("scripting (each also available as a tool inside the harness):")}
+  chat                                         open the interactive harness (default with no arguments)
   setup                                        interactive first-time setup (idempotent; wraps fresh-install.sh)
   doctor                                       preflight all dependencies (safe, read-only)
   plan       --app <name> [--idea "..."]       dry-run: show exact commands per step + current state
@@ -56,6 +55,19 @@ ${bold("environment:")} ${dim("(auto-loaded from ./.env — written by fresh-ins
 ${dim("docs: README.md (quickstart) · RUNBOOK.md (ops) · PLAN.md (design + doc caveats)")}`;
 
 switch (cmd) {
+  case undefined:
+  case "chat": {
+    // The interactive harness: Pi's TUI running in this repo, which loads .pi/settings.json ->
+    // provisioner tools (provision_app, teardown_app, verify_app, app_status, plan_app, doctor)
+    // + harness-ops skill. Pi is a wrapped dependency; this spawns its pinned CLI.
+    const { spawnSync } = await import("node:child_process");
+    const root = new URL("..", import.meta.url).pathname;
+    const piBin = `${root}node_modules/.bin/pi`;
+    const { existsSync } = await import("node:fs");
+    if (!existsSync(piBin)) fatal("chat", "pi binary not found — run `npm install` in the harness repo first.");
+    const r = spawnSync(piBin, rest, { cwd: root, stdio: "inherit", env: process.env });
+    process.exit(r.status ?? 0);
+  }
   case "setup": {
     const { spawnSync } = await import("node:child_process");
     const root = new URL("..", import.meta.url).pathname;

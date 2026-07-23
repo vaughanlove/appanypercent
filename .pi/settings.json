@@ -1,4 +1,4 @@
 {
-  "extensions": ["./extensions/port-contract.ts"],
+  "extensions": ["./extensions/provisioner.ts"],
   "skills": ["./skills"]
 }

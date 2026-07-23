@@ -1,0 +1,4 @@
+{
+  "extensions": ["./extensions/port-contract.ts"],
+  "skills": ["./skills"]
+}

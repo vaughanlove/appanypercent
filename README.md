@@ -25,6 +25,24 @@ and `npm run <cmd> --` ≡ `appanypercent <cmd>`.)
 
 ## Use
 
+**Interactive (the main interface):** just run it with no arguments —
+
+```bash
+appanypercent
+```
+
+…which opens a Pi session inside the harness with the pipeline registered as tools
+(`provision_app`, `teardown_app`, `verify_app`, `app_status`, `plan_app`, `doctor`) plus the normal
+read/bash/edit/write tools and a `harness-ops` playbook skill. So you can drive it conversationally:
+
+> “provision a guestbook called demo, make it public” · “is demo healthy? check its logs” ·
+> “add a dueDate column to demo's schema and re-migrate” · “tear down everything matching pipe-*”
+
+Long steps stream live into the session; provisioning stays idempotent and state-backed, so the
+agent can retry failed steps safely. First launch asks you to trust the project (that loads `.pi/`).
+
+**Scripting (same engine, one-shot):**
+
 ```bash
 appanypercent plan --app demo --idea "a guestbook"        # dry run — prints every command, runs nothing
 appanypercent provision --app demo --idea "a guestbook" --public   # the real thing (~minutes)
@@ -100,7 +118,8 @@ A ladder, cheapest first:
 | `src/cli.ts` | commands: doctor, plan, provision, verify, status, teardown |
 | `src/provision.ts` | the 9-step orchestrator (idempotent, state-backed) |
 | `src/deploy-request.ts` | the deploy-request step — **read its header**: PlanetScale Postgres has no deploy requests today; documented adaptation + MCP verification |
-| `.pi/` | Pi customization (no fork): port-contract extension, exe.dev + PlanetScale/Prisma skills |
+| `.pi/` | **operator-side** harness: provisioner tools extension + harness-ops skill (loaded by `appanypercent` interactive) |
+| `vm/.pi/` | **VM-side** Pi customization shipped to app VMs: port-contract extension, exe-app/planetscale-prisma/exe-auth skills |
 | `agent/` | VM-side embedded-Pi runner, Pi pinned at 0.81.1 |
 | `PLAN.md` | design, secrets/blast-radius model, doc ambiguities found |
 | `RUNBOOK.md` | full ops runbook incl. common failures |

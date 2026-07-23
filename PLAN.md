@@ -101,6 +101,17 @@ Username format (verified): `{role}.{branch_id}`; password prefix `pscale_pw_`; 
 
 ## 4. Pi integration (embedded, extension-over-modification)
 
+Pi appears **twice**, on opposite sides of the security boundary, with separate `.pi/` trees:
+
+- **Operator side** (`.pi/` at repo root): `appanypercent` with no arguments launches Pi's TUI in
+  this repo; `.pi/extensions/provisioner.ts` registers the pipeline as tools (`provision_app`,
+  `teardown_app`, `verify_app`, `app_status`, `plan_app`, `doctor` — each shells out to the same
+  CLI, so agent-driven and human-driven runs share state/idempotency), and
+  `.pi/skills/harness-ops` is the operating playbook. This side holds pscale/exe.dev credentials.
+- **VM side** (`vm/.pi/`, rsynced to each app VM): port-contract extension + exe-app /
+  planetscale-prisma / exe-auth skills. Never receives control-plane credentials; the operator
+  `.pi/` is never shipped to a VM.
+
 - Pi is consumed as a pinned npm dependency (`@earendil-works/pi-coding-agent@0.81.1`, exact pin in
   both `package.json`s + lockfile). **No fork.** No core-behavior change was needed; the extension API
   (tool_call interception, skills) covered everything. If a future need touches the agent loop,
@@ -115,6 +126,12 @@ Username format (verified): `{role}.{branch_id}`; password prefix `pscale_pw_`; 
   - `.pi/skills/exe-app/SKILL.md` — exe.dev proxy/port contract, healthz requirement, X-Forwarded-* headers.
   - `.pi/skills/planetscale-prisma/SKILL.md` — schema.prisma/prisma.config.ts conventions, pooled vs
     direct URL rules (runtime = 6432, never DDL at runtime).
+  - `.pi/skills/exe-auth/SKILL.md` — authentication = exe.dev's "Login with exe" (proxy-injected
+    `X-ExeDev-UserID`/`X-ExeDev-Email` headers, `/__exe.dev/login` redirect). Deliberately NOT
+    better-auth or any OAuth framework by default: exe.dev's recommended mechanism is header-based
+    identity at the proxy (docs/login-with-exe), which has no OAuth/OIDC surface for an auth library
+    to integrate with — the app only does authorization + a lazy Prisma `User` upsert keyed on the
+    stable UserID. App-managed accounts (e.g. better-auth) are an explicit opt-in escalation only.
 
 ## 5. App ↔ proxy port contract (explicit, can't fail silently)
 
