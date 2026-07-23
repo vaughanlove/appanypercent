@@ -9,21 +9,29 @@ idea ──▶ exe.dev micro-VM ──▶ PlanetScale branch + 2 scoped roles �
      ──▶ prisma migrate (direct :5432) ──▶ MCP schema verify ──▶ proxy pinned to PORT ──▶ live ✅
 ```
 
-## Quickstart
+## Install (2 commands)
 
 ```bash
-git clone <this repo> && cd appanypercent
-./fresh-install.sh                               # 0. one-command setup: deps, pscale, exe.dev key,
-                                                 #    prompts for config -> ./.env, then runs doctor
-npm run plan -- --app demo --idea "a guestbook"  # 1. dry run — prints every command, runs nothing
-npm run provision -- --app demo --idea "a guestbook" --public   # 2. the real thing (~minutes)
-open https://demo.exe.xyz                        # 3. it's live
-npm run teardown -- --app demo                   # 4. destroy VM + branch + roles, ~free
+curl -fsSL https://raw.githubusercontent.com/vaughanlove/appanypercent/main/install.sh | bash
+appanypercent setup
 ```
 
-`fresh-install.sh` is idempotent — re-run it after fixing anything; it keeps existing answers
-(stored in `./.env`, gitignored, chmod 600, auto-loaded by the CLI; real env vars always win).
-Prefer manual setup? Export the env vars listed in `npx tsx src/cli.ts` help and run `npm run doctor`.
+The one-liner clones the harness to `~/.appanypercent`, installs pinned deps (including Pi), and
+links `appanypercent` into `~/.local/bin`. `setup` is the interactive first-run: installs `pscale`
+if missing, registers your SSH key with exe.dev, prompts config/secrets into `./.env` (0600,
+auto-loaded by the CLI; real env vars win), and finishes with `doctor`. Both are idempotent —
+re-run after fixing anything. (Working from a clone instead? `./fresh-install.sh` ≡ `setup`,
+and `npm run <cmd> --` ≡ `appanypercent <cmd>`.)
+
+## Use
+
+```bash
+appanypercent plan --app demo --idea "a guestbook"        # dry run — prints every command, runs nothing
+appanypercent provision --app demo --idea "a guestbook" --public   # the real thing (~minutes)
+open https://demo.exe.xyz                                 # it's live
+appanypercent teardown --app demo                         # destroy VM + branch + roles, ~free
+appanypercent update                                      # pull harness updates + Pi pin bumps
+```
 
 Run `npx tsx src/cli.ts` with no arguments any time to see the walkthrough again.
 

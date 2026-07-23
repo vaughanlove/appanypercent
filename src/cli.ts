@@ -30,14 +30,14 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const usage = `${bold("appanypercent")} — app idea -> live <name>.exe.xyz backed by an isolated PlanetScale Postgres branch
 
 ${bold("walkthrough (in order):")}
-  0. ./fresh-install.sh                                    ${dim("one-command setup: deps, pscale, exe.dev key, .env config, doctor")}
-  1. npm run doctor                                        ${dim("preflight: checks ssh/exe.dev, pscale, tokens — rerun any time")}
-  2. npm run plan      -- --app demo --idea "a guestbook"  ${dim("dry run: prints every command, executes nothing")}
-  3. npm run provision -- --app demo --idea "a guestbook" --public
+  1. appanypercent setup                                     ${dim("one-time: pscale, exe.dev key, config -> .env, doctor")}
+  2. appanypercent plan --app demo --idea "a guestbook"      ${dim("dry run: prints every command, executes nothing")}
+  3. appanypercent provision --app demo --idea "a guestbook" --public
   4. open https://demo.exe.xyz
-  5. npm run teardown  -- --app demo                       ${dim("deletes VM + DB branch + roles; safe on half-provisioned apps")}
+  5. appanypercent teardown --app demo                       ${dim("deletes VM + DB branch + roles; safe on half-provisioned apps")}
 
 ${bold("commands:")}
+  setup                                        interactive first-time setup (idempotent; wraps fresh-install.sh)
   doctor                                       preflight all dependencies (safe, read-only)
   plan       --app <name> [--idea "..."]       dry-run: show exact commands per step + current state
   provision  --app <name> --idea "..."         create VM + DB branch + roles, generate app with Pi, migrate, go live
@@ -45,6 +45,7 @@ ${bold("commands:")}
   verify     --app <name> [--port 8080]        re-run the two-level liveness check
   status     --app <name>                      dump the persisted per-step provisioning state
   teardown   --app <name>                      destroy everything for this app (idempotent)
+  update                                       git pull this harness + reinstall deps (picks up Pi pin bumps)
 
 ${bold("environment:")} ${dim("(auto-loaded from ./.env — written by fresh-install.sh; real env vars win)")}
   PS_ORG, PS_DATABASE                          PlanetScale org + parent Postgres database (branch parent)
@@ -55,6 +56,32 @@ ${bold("environment:")} ${dim("(auto-loaded from ./.env — written by fresh-ins
 ${dim("docs: README.md (quickstart) · RUNBOOK.md (ops) · PLAN.md (design + doc caveats)")}`;
 
 switch (cmd) {
+  case "setup": {
+    const { spawnSync } = await import("node:child_process");
+    const root = new URL("..", import.meta.url).pathname;
+    const r = spawnSync("bash", [`${root}fresh-install.sh`], { stdio: "inherit" });
+    process.exit(r.status ?? 1);
+  }
+  case "update": {
+    // Pi is a wrapped, pinned dependency — never a fork. Updating the harness (including any
+    // Pi pin bump committed upstream) is: git pull + npm install, in both package roots.
+    const { spawnSync } = await import("node:child_process");
+    const root = new URL("..", import.meta.url).pathname;
+    const sh = (c: string, args: string[], cwd = root) => {
+      const r = spawnSync(c, args, { cwd, stdio: "inherit" });
+      if (r.status !== 0) fatal("update", `${c} ${args.join(" ")} failed (exit ${r.status})`);
+    };
+    const piVer = () => {
+      const r = spawnSync("node", ["-p", "require('@earendil-works/pi-coding-agent/package.json').version"], { cwd: root, encoding: "utf8" });
+      return r.stdout?.trim() ?? "?";
+    };
+    const before = piVer();
+    sh("git", ["pull", "--ff-only"]);
+    sh("npm", ["install", "--no-audit", "--no-fund"]);
+    const after = piVer();
+    console.log(before === after ? `updated. Pi still pinned at ${after}.` : `updated. Pi ${before} -> ${after} (VM runners get the new pin on next provision).`);
+    break;
+  }
   case "doctor": {
     const { doctor } = await import("./doctor.ts");
     await doctor();

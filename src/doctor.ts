@@ -35,6 +35,21 @@ export async function doctor(): Promise<void> {
     have(bin) ? ok(bin, "installed") : fail(bin, "not found in PATH", `Install ${bin} (apt/brew install ${bin}).`);
   }
 
+  // Pi is wrapped (pinned dependency, no fork) in two places: the harness and the VM-side runner.
+  // They must pin the same version or generation behavior drifts from what you tested.
+  try {
+    const { readFileSync } = await import("node:fs");
+    const root = new URL("..", import.meta.url).pathname;
+    const dep = (p: string) => JSON.parse(readFileSync(p, "utf8")).dependencies?.["@earendil-works/pi-coding-agent"];
+    const harness = dep(`${root}package.json`);
+    const agent = dep(`${root}agent/package.json`);
+    harness === agent
+      ? ok("pi pin", `${harness} (harness and VM runner match; no fork — update via \`appanypercent update\`)`)
+      : warn("pi pin", `harness pins ${harness}, agent/ pins ${agent}`, "Keep both package.json pins identical so in-VM generation matches what you tested.");
+  } catch (err: any) {
+    warn("pi pin", `could not compare pins: ${err?.message}`, "Check dependencies in package.json and agent/package.json.");
+  }
+
   // 2. exe.dev (the API is SSH) ----------------------------------------------
   const exe = run("doctor", "ssh", ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10", "exe.dev", "whoami", "--json"], {
     allowFail: true,

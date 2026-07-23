@@ -132,9 +132,9 @@ npm run --silent doctor && DOCTOR_OK=1 || DOCTOR_OK=0
 echo
 if [ "$DOCTOR_OK" = 1 ]; then
   bold 'setup complete — next:'
-  echo '  npm run plan      -- --app demo --idea "a guestbook"        (dry run)'
-  echo '  npm run provision -- --app demo --idea "a guestbook" --public'
+  echo '  appanypercent plan --app demo --idea "a guestbook"        (dry run)'
+  echo '  appanypercent provision --app demo --idea "a guestbook" --public'
 else
-  bold "setup incomplete — fix the ✗ items above and re-run ./fresh-install.sh (it is idempotent)."
+  bold "setup incomplete — fix the ✗ items above and re-run: appanypercent setup   (idempotent)"
   exit 1
 fi

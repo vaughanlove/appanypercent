@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Provisioning pipeline: idea -> live appname.exe.xyz backed by an isolated PlanetScale Postgres branch",
+  "bin": { "appanypercent": "bin/appanypercent.mjs" },
   "scripts": {
     "doctor": "tsx src/cli.ts doctor",
     "plan": "tsx src/cli.ts plan",
