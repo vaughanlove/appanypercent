@@ -71,14 +71,18 @@ switch (cmd) {
       const r = spawnSync(c, args, { cwd, stdio: "inherit" });
       if (r.status !== 0) fatal("update", `${c} ${args.join(" ")} failed (exit ${r.status})`);
     };
-    const piVer = () => {
-      const r = spawnSync("node", ["-p", "require('@earendil-works/pi-coding-agent/package.json').version"], { cwd: root, encoding: "utf8" });
-      return r.stdout?.trim() ?? "?";
+    const piVer = async () => {
+      try {
+        const { readFileSync } = await import("node:fs");
+        return JSON.parse(readFileSync(`${root}node_modules/@earendil-works/pi-coding-agent/package.json`, "utf8")).version as string;
+      } catch {
+        return "?";
+      }
     };
-    const before = piVer();
+    const before = await piVer();
     sh("git", ["pull", "--ff-only"]);
     sh("npm", ["install", "--no-audit", "--no-fund"]);
-    const after = piVer();
+    const after = await piVer();
     console.log(before === after ? `updated. Pi still pinned at ${after}.` : `updated. Pi ${before} -> ${after} (VM runners get the new pin on next provision).`);
     break;
   }

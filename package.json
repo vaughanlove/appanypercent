@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Provisioning pipeline: idea -> live appname.exe.xyz backed by an isolated PlanetScale Postgres branch",
-  "bin": { "appanypercent": "bin/appanypercent.mjs" },
+  "bin": {
+    "appanypercent": "bin/appanypercent.mjs"
+  },
   "scripts": {
     "doctor": "tsx src/cli.ts doctor",
     "plan": "tsx src/cli.ts plan",
@@ -22,6 +24,7 @@
     "tsx": "^4.19.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "typescript": "^7.0.2"
   }
 }

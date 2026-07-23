@@ -33,7 +33,7 @@ else
 fi
 
 (cd "$HOME_DIR" && npm install --no-audit --no-fund >/dev/null)
-PI_VERSION=$(cd "$HOME_DIR" && node -p "require('@earendil-works/pi-coding-agent/package.json').version")
+PI_VERSION=$(cd "$HOME_DIR" && node -p "JSON.parse(require('fs').readFileSync('node_modules/@earendil-works/pi-coding-agent/package.json','utf8')).version")
 okay "dependencies installed (Pi pinned at $PI_VERSION)"
 
 mkdir -p "$BIN_DIR"
